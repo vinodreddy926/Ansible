@@ -1,0 +1,79 @@
+1.Ansible setup:-
+1.Control node:-
+==> vi /etc/ansible/hosts --> here we can add private ip of remote servers
+==> vi /etc/ansible/ansible.cfg -->if required enable inventory and user root
+#yum install python*
+#useradd ansible
+#passwd ansible
+#Give root prvilages to the ansible user /etc/sudoers.d/ or visudo
+#vi /etc/ssh/sshd_config -->PasswordAuthentication should be YES
+#systemctl restart sshd
+#ssh-keygen
+ssh-copy-id ansible@localhost -->local ip
+ssh-copy-id ansible@public ip
+
+or
+scp .ssh/id_rsa.pub user@somedomain:~/.ssh/authorized_keys
+
+2.Remote servers:-
+#yum install python*
+#useradd ansible 
+#passwd ansible
+#visudo -->ansible for root privilages
+#vi /etc/ssh/sshd_config -->PasswordAuthentication should be YES
+#systemctl restart sshd
+====================================================================
+2.What is ansible?
+=> Ansible is an open source automation tool used for configuration management, application deployment, and task automation.
+It is agentless and free to use and paybooks are written in YAML formate.(Yet Another Markup Language)
+====================================================================
+3.Module:-
+=>Commands we want to execute on the client mechine or remote mechines
+4.Task:-
+=>A task can have multiple modules
+5.Playbook:-
+=>Automation file with step by step execution of multiple tasks
+=====================================================================
+4.What is ansible role? 
+https://galaxy.ansible.com/ui/standalone/roles/ -->here we can use roles was published by someone
+=>Roles allow you to break down a complex playbook into smaller.
+The default search path is ~/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles
+=====================================================================
+5.What is handler?
+=>If any configuration files changes then we need to restart the service so here we can use handlers to restart 
+the required service with the help of notify.
+
+Ex:-
+- name: Write the apache config file
+      ansible.builtin.template:
+        src: /srv/httpd.j2
+        dest: /etc/httpd.conf
+      notify:
+        - Restart apache
+
+    - name: Ensure apache is running
+      ansible.builtin.service:
+        name: httpd
+        state: started
+
+  handlers:
+    - name: Restart apache
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+=====================================================================
+6.Modules we know
+1.yum, apt
+2.copy
+3.vars
+4.register
+5.debug
+6.package
+7.service
+8.file
+9.lineinfile
+10.command, shell
+11.reboot
+=====================================================================
+
+

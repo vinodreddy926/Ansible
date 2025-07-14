@@ -1,0 +1,116 @@
+1.User Creation ansible playbook:-
+
+[ansible@scprlrpm01 Scripts]$ cat osadmin_usercreate.yml
+---
+- name: Yaml for User add
+  hosts: all
+  remote_user: ansible
+  gather_facts: no
+  become: true
+  tasks:
+    - name: Check if the user exists or not in the server
+      shell: id "{{user_name}}"
+      register: user_check
+      changed_when: false
+      ignore_errors: true
+    - name: Create user "{{user_name}}"
+      shell: 'useradd -G wheel -c "{{comment_user}}" -s /bin/bash "{{user_name}}"'
+      register: result
+      when: user_check.rc == 1
+    - name: display the output
+      debug:
+        var: result
+    - name: Reset user password
+      user:
+        name: "{{user_name}}"
+        state: present
+        shell: /bin/bash
+        password: "{{ 'QAZwsx!23' | password_hash('sha512') }}"
+    - name: Force user to change password once login to the server
+      shell: chage -d 0 "{{user_name}}"
+
+[ansible@scprlrpm01 Scripts]$
+===================================================
+Command:-
+ansible-playbook -i vinod.txt /home/ansible/osadmin/osadmin_usercreate.yml --extra-vars "comment_user='Vinod Kumar Reddy Ailuri - vailuri.c@stc.com.sa |CSO1005130 | OS Admin' user_name=vailuri" 
+===================================================
+1.changed_when: false (without)
+#If the command is executed and produces any output, ansible might interpret it as a change
+#Even though the task is just checking the system state (id user name) when execute this cmd when user exists or not it will show in result like changed 1
+changed_when: false (with)
+it will not show in result like changed 1
+2.ignore_errors: true
+The playbook will proceed to the next task even if the mention cmd or task fails. 
+if we want to halt the playbook execution ignore_errors: false
+===================================================
+2.Reset password for a user ansible playbook
+
+[ansible@scprlrpm01 Scripts]$ cat resetpasswd_user.yml
+---
+- name: Yaml for User password reset
+  hosts: all
+  gather_facts: no
+  remote_user: ansible
+  become: true
+
+  tasks:
+    - name: Check if the user exists or not in the server
+      shell: id "{{user_name}}"
+      register: user_check
+      changed_when: false
+      ignore_errors: true
+    - name: debug the above save result
+      debug:
+        var: user_check
+    - name: Reset user password
+      user:
+        name: "{{user_name}}"
+        state: present
+        shell: /bin/bash
+        password: "{{ 'QAZwsx!23' | password_hash('sha512') }}"
+      when: user_check.rc == 0
+
+    - name: Check the faillock attempts of the user
+      shell: faillock --user "{{user_name}}"
+      register: check_faillock
+
+    - name: List the attempts
+      debug:
+        var: check_faillock
+
+    - name: Reset user faillock attempts
+      shell: faillock --user "{{user_name}}" --reset
+
+    - name: Force user to change password once login to the server
+      shell: chage -d 0 "{{user_name}}"
+You have new mail in /var/spool/mail/ansible
+[ansible@scprlrpm01 Scripts]$
+=================================================
+Command:-
+ansible-playbook -i vinod.txt /home/ansible/osadmin/resetpasswd_user.yml --extra-vars "user_name=vailuri" 
+=================================================
+3.Copy file or directory to the remote server ansible playbook
+
+[ansible@scprlrpm01 Scripts]$ cat vinodcp.yml
+---
+- name: Copy the file to the remote server
+  hosts: all
+  gather_facts: no
+  remote_user: ansible
+  become: true
+
+  tasks:
+    - name: Copy the file
+      copy:
+        src: "{{source_path}}"
+        dest: "{{dest_path}}"
+        mode: '0755'
+
+[ansible@scprlrpm01 Scripts]$
+==================================================
+Command:-
+ansible-playbook -i vinod.txt vinodcp --extra-vars "source_path=/home/vailuri/filename dest_path=/tmp/"
+if server is able to login with 2022 use this command:-
+--ssh-common-args="-p 2022"
+ansible-playbook -i vinod.txt vinodcp --extra-vars "source_path=/home/vailuri/filename dest_path=/tmp/" --ssh-common-args="-p 2022"
+==================================================
