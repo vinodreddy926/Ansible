@@ -1,0 +1,243 @@
+ ---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: get the disk space
+    command: df -h /boot
+    register: disk_space
+  - name: get the value
+    debug:
+      var: disk_space
+  - name: Execute Command if Disk Space is Less Than 75%
+    ansible.builtin.shell:
+      cmd: "cat /etc/fstab"
+    register: fstab
+  - name: get the value
+    debug:
+      var: fstab
+    when: disk_space.stdout|int < 75
+
+====================================================
+[ansible@ip-172-31-5-244 ~]$ cat vinod.yml
+---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: get the disk space
+    command: df -h /boot
+    register: disk_space
+  - name: get the value
+    debug:
+      var: disk_space
+  - name: Execute Command if Disk Space is Less Than 50%
+    ansible.builtin.shell:
+      cmd: "cat /etc/fstab"
+    register: fstab
+  - name: get the value
+    debug:
+      var: fstab
+    when: disk_space.stdout|int >= 30
+[ansible@ip-172-31-5-244 ~]$
+======================================================
+[ansible@ip-172-31-5-244 ~]$ cat boot.yml
+---
+- hosts: webservers
+  become: yes
+  tasks:
+    - name: get the disk space
+      ansible.builtin.shell:
+        cmd: "df -h /boot | awk 'NR==2 {print $5}' | tr -d '%'"
+      register: disk_space
+
+    - name: Debug Raw Disk Space Value
+      debug:
+        var: disk_space.stdout
+
+    - name: Debug Disk Space Value
+      debug:
+        var: disk_space.stdout|int
+
+    - name: Execute Command if Disk Space is greater Than 50%
+      ansible.builtin.shell:
+        cmd: "cat /etc/fstab"
+      register: fstab
+      when: disk_space.stdout|int >= 50
+
+    - name: Debug Fstab Value
+      debug:
+        var: fstab
+
+[ansible@ip-172-31-5-244 ~]$
+===========================================
+
+---
+- host: all
+  become: yes
+  tasks:
+  - name: Take the back of the server
+    shell: df -h && cat /etc/fstab && blkid && lsblk -f && free -h && ip a && service network status
+    register: command_output
+ - name: To see the command info below
+   debug:
+     var: command_output
+ - name: To send the command_output to the mail
+   copy:
+     content: "{{ command_output.stdout }}"
+     dest: /tmp/server_backup
+ - name: server_backup file send it to mail
+   shell: cat /tmp/server_backup | mailx -s " Prodservers " vinodailuri926@gmail.com
+ -  - name: get the disk space
+      ansible.builtin.shell:
+        cmd: "df -h /boot | awk 'NR==2 {print $5}' | tr -d '%'"
+      register: disk_space
+
+    - name: Debug Raw Disk Space Value
+      debug:
+        var: disk_space.stdout
+
+    - name: Debug Disk Space Value
+      debug:
+        var: disk_space.stdout|int
+
+    - name: Execute Command if Disk Space is less Than 75%
+      yum:
+        name: '*'
+        state: latest
+        skip_broken: yes
+      when: 
+        - disk_space.stdout|int <= 75
+        - (ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] |int > 6)
+        - (ansible_facts['os_family'] == "Centos" and ansible_facts['distribution_major_version'] |int > 6)
+============================================================
+---> when boot having 5 files then execute the below servers
+
+[ansible@ip-172-31-5-244 ~]$ cat kernel.yml
+#rpm -q kernel --last or yum list kernel
+#ll /boot/*kernel*
+#there should be 5 files
+
+---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: liet the kernel version
+    shell: yum list kernel | awk '{print $2}' | tail -n 1
+    register: kernel_version
+  - name: debug the value
+    debug:
+      var: kernel_version
+
+  - name: pic the latest kernel
+    shell: ls -lrth /boot/*{{ kernel_version.stdout }}*
+    register: boot
+  - name: boot
+    debug:
+      var: boot
+  - name: run the below command when boot having equal to 5 files
+    shell: df -h
+    when: boot.stdout_lines | length <= 4
+
+ #   register: df -h_out
+  - name: show the result
+    debug:
+      var: df -h_out
+
+
+[ansible@ip-172-31-5-244 ~]$
+==============================================================
+           
+[ansible@ip-172-31-5-244 ~]$ cat kernel.yml
+#rpm -q kernel --last or yum list kernel
+#ll /boot/*kernel*
+#there should be 5 files
+
+---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: liet the kernel version
+    shell: yum list kernel | awk '{print $2}' | tail -n 1
+    register: kernel_version
+  - name: debug the value
+    debug:
+      var: kernel_version
+
+  - name: pic the latest kernel
+    shell: ls -lrth /boot/*{{ kernel_version.stdout }}*
+    register: boot
+  - name: boot
+    debug:
+      var: boot
+  - name: reboot the mechine
+    reboot:
+      reboot_timeout: 3600
+    when: boot.stdout_lines | length <= 5
+
+ #   register: df -h_out
+  - name: show the result
+    debug:
+      var: df -h_out
+
+
+[ansible@ip-172-31-5-244 ~]$
+===============================================
+
+---
+- name: Patch the servers
+  hosts: all
+  become: yes
+  tasks:
+    - name: Pre-checks
+      block:
+        - name: Gather facts
+          setup:
+            - name: run the pre-checks commands
+              command: "{{ item }}"
+              loop:
+                - hostname -f
+                - cat /etc/fastab
+                - uname -a
+                - vmstat
+                - df -h;df -h |wc -l
+                - lsblk -f
+                - free -h
+                - ip a 
+                - ip r l
+              register: pre-checks_result
+      rescue:
+        - name: Prechecks failed
+          fail:
+            msg: Prechecks failed pls review before moving forward
+        - name: Update packages
+          yum:
+            name : "*"
+            state: latest
+          register: yum_result
+        - name: Reboot if neccessary
+          when: yum_result.changed
+          reboot:
+        - name: Post checks
+          block:
+            - name: run the post-checks commands
+              command: "{{ item }}"
+              loop:
+                - hostname -f
+                - cat /etc/fastab
+                - uname -a
+                - vmstat
+                - df -h;df -h |wc -l
+                - lsblk -f
+                - free -h
+                - ip a 
+                - ip r l
+              register: post-checks_result
+          rescue:
+            - name: Prechecks failed
+              fail:
+                msg: Prechecks failed pls review before moving forward
+            - name: Compare both
+              assert:
+                that:
+                  - pre-checks_result.stdout_lines == post-checks_result.stdout_lines
+                fail_msg: both outputs differ pls review
+ 

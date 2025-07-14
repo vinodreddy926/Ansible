@@ -1,0 +1,306 @@
+1. Update the system with available packages and kernel then reboot the server, the yml looks like below.
+
+---
+
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: update kernel and packages
+    yum:
+      name: '*'
+      state: latest
+  - name: reboot the mechine
+    reboot:
+      reboot_timeout: 3600
+[ansible@ip-172-31-5-244 ~]$
+
+========================================
+ad-hoc command 
+ansible -i hosts -m ping all
+ansible -i hosts -m apt "state: present name= apache2" all
+ansible -i hosts -m service -a "name=apache2 state=restarted enabled=yes"
+ 
+ansible-playbook -i hosts lamp.yml
+
+2.how can i run a playbook on diffrent platforms like ubuntu , redhat, debian
+
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: install git
+    apt: 
+      name: git
+      state: present
+     when: ansible_os_family == "Ubuntu"
+   - name: install git
+     yum:
+       name: git
+       state: present
+      when: ansible_os_family == "Redhat"
+===========================================
+3.install packages in diffrent OS platforms like redhat, ubuntu
+---
+- hosts: all
+  become: yes
+  var:
+    package_name: httpd
+  tasks:
+  - name: install apache
+    package: "{{ package_name }}"
+      name:
+      state: present
+
+ansible-playbook -i hosts -e "package_name= apache2" var.yml
+=======================================
+4.Loop concept installing multiple packages or creating users
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: install packages
+    apt: 
+      name: "{{ item }}"
+      state: present
+    loop:
+      - git
+      - apache2
+=================================
+5.Creating multiple users 
+[ansible@ip-172-31-5-244 ~]$ cat vinod.yml
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: add multiple users
+    user:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - user1
+      - user2
+      - user3
+      - user4
+
+[ansible@ip-172-31-5-244 ~]$
+creating single user with specific "uid"
+[ansible@ip-172-31-5-244 ~]$ cat reddy.yml
+---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: add multiple users
+    ansible.builtin.user:
+      name: "testuser3"
+      state: present
+      groups: "wheel"
+      uid: 1009
+[ansible@ip-172-31-5-244 ~]$
+deleting all user
+[ansible@ip-172-31-5-244 ~]$ cat vinod.yml
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: add multiple users
+    command: userdel -r "{{ item }}"
+    loop:
+      - user1
+      - user2
+      - user3
+      - user4
+
+[ansible@ip-172-31-5-244 ~]$
+============================================
+6.Handlers:Handlers are commonly used in Ansible to start, reload, restart, and stop services. If your playbook calls for changing configuration files, you'll almost certainly need to restart a service to see the changes take effect.
+
+Example:
+- hosts: all
+  become: yes
+  tasks:
+  - name: update packages & install apache
+    apt:
+    name: apache2
+    state: present
+    notify:
+    - start apach2
+  - name: installing php packaages
+    apt:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - php
+      - libapache2-mod-php
+      - php-mcrypt
+    notify:
+    - restat apache
+   - name: copy info.php
+     copy:
+       src: info.php
+       dest: /var/www/html/info.php
+   handlers:
+   - name: restat apache
+     service:
+       name: apache
+       state: restarted
+   - name: start apache
+     service:
+       name: apache2
+       enabled: yes
+       state: started
+============================================================================
+7)Register:-
+When you run a task in Ansible, the entire output of the task will not be printed to stdout(Terminal). If you wish to see the output of the task, then you have to store it in the register variable and then later print it. In ansible, debug module is used to print the output to the terminal.
+
+Example:
+---
+- hosts: all
+  become: yes
+  vars:
+    url: http://s3.us-west-2.amazon
+    destination: /home/ansible/index.html
+  tasks:
+  - name: download file
+    get_url:
+      url: "{{ url }}"
+      dest: "{{ destination }}"
+   - debug:
+       msg: "download file from {{ url }} to {{ destination }}"
+       verbosity: 0
+   - name: Reading content by linux command
+     command: cat "{{ destination }}"
+     register: dest_content
+   - debug:
+       var: dest_content
+       verbosity: 0
+------------------------
+1.stderr : " ", --When it is empty our written yml is correct if it has a value execution has failed
+2.stderr_lines: here we can see each error 
+==============================================
+8) Top 10 modules mostly used by sysadmin
+1.copy:-
+- name: Ensure MOTD file is in place
+  copy:
+    src: files/motd
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: 0644
+For less complex content, you can copy the content directly to the destination file without having a local file, like this:
+
+- name: Ensure MOTD file is in place
+  copy:
+    content: "Welcome to this system."
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: 0644
+=============================================
+2.User:-
+For example, to create the user ricardo with UID 2001, part of the groups users and wheel, and password mypassword, apply the user module with these parameters:
+
+- name: Ensure user ricardo exists
+  user:
+    name: ricardo
+    group: users
+    groups: wheel
+    uid: 2001
+    password: "{{ 'mypassword' | password_hash('sha512') }}" 
+    state: present
+================================================
+3.Package:-The package module allows you to install, update, or remove software packages from your target system using the operating system standard package manager.
+For example, to install the Apache web server on a Red Hat Linux machine, apply the module like this:
+
+- name: Ensure Apache package is installed
+  package:
+    name: httpd
+    state: present
+==================================================
+4.Service:- it is used to start,restart,enabled,disabled the service.
+
+- name: Ensure SSHD is started
+  service:
+    name: sshd
+    state: started
+==================================================
+5.File:-
+For instance, use the file module to create a directory /app owned by the user ricardo, with read, write, and execute permissions for the owner and the group users:
+
+- name: Ensure directory /app exists
+  file:
+    path: /app
+    state: directory
+    owner: ricardo
+    group: users
+    mode: 0770
+====================================================
+6.lineinfile:-The lineinfile module allows you to manage single lines on existing files.
+For example, add a new entry to your hosts file like this:
+
+- name: Ensure host rh8-vm03 in hosts file
+  lineinfile:
+    path: /etc/hosts
+    line: 192.168.122.236 rh8-vm03
+    state: present
+You can also use this module to change an existing line by applying the parameter regexp to look for an existing line to replace. For example, update the sshd_config file to prevent root login by modifying the line PermitRootLogin yes to PermitRootLogin no:
+
+- name: Ensure root cannot login via ssh
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin'
+    line: PermitRootLogin no
+    state: present
+=====================================================
+7.unarchive:-
+Use the unarchive module to extract the contents of archive files such as tar or zip files. By default, it copies the archive file from the control node to the target machine before extracting it. Change this behavior by providing the parameter remote_src: yes.
+
+For example, extract the contents of a .tar.gz file that has already been downloaded to the target host with this syntax:
+
+- name: Extract contents of app.tar.gz
+  unarchive:
+    src: /tmp/app.tar.gz
+    dest: /app
+    remote_src: yes
+=======================================================
+8.command or shell:-
+- name: run below cmd
+  command: "cat /etc/fstab"
+=======================================================
+9.setup:-
+ansible.builtin.setup module – Gathers facts about remote hosts
+            "ansible_os_family": "RedHat",
+            "ansible_distribution": "RedHat",
+            "ansible_distribution_major_version": "9",
+            "ansible_distribution_version": "9.3",
+=============================================================
+run the below command when server is redhat and verion is below 9
+[ansible@ip-172-31-5-244 ~]$ cat version.yml
+---
+- hosts: webservers
+  become: yes
+  tasks:
+  - name: get os version of the server
+    ansible.builtin.setup:
+     gather_subset:
+        - '!all'
+    register: facts
+
+  - name: Debug OS Facts
+    debug:
+      var: facts
+
+  - name: run the below command when server version is above 6
+    shell: df -h|wc -l
+    register: output
+    when: (ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution_major_version'] |int < 9)
+  - name: debug the values
+    debug:
+      var: output
+[ansible@ip-172-31-5-244 ~]$
+================================================================
+
+
+
+
+
+
+
+

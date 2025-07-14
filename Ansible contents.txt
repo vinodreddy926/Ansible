@@ -1,0 +1,8 @@
+Ansible;-
+1.What is ansible?
+2.How to setup Ansible?
+3.what is module, task, playbook?
+4.galaxy.asible.com
+5.What is handler
+6.what modules you know.
+
